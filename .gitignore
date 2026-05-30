@@ -1,0 +1,6 @@
+__pycache__/
+*.pt
+*.zip
+venv/
+*.pyc
+elliptic_bitcoin_dataset/

@@ -7,12 +7,23 @@ from torch_geometric.data import Data
 
 data = torch.load('elliptic_graph.pt', weights_only=False)
 
-model = FraudGNN(in_channels=166, hidden_channels=64, out_channels=2)
+from tgn import tgn
+
+model = tgn(
+    num_nodes=203769,
+    node_feature_dim=166,
+    memory_dim=64,
+    hidden_dim=64,
+    out_channels=2
+)
 model.load_state_dict(torch.load('fraud_gnn_model.pt'))
 model.eval()
 
+# get timestamps for full edge_index
+timestamps = data.x[data.edge_index[0], 0].float()
+
 with torch.no_grad():
-    out, h = model(data.x, data.edge_index)
+    out, h = model(data.x, data.edge_index, timestamps)
 preds = out.argmax(dim=1)
 
 fraud_nodes = (data.y == 1).nonzero(as_tuple=True)[0]

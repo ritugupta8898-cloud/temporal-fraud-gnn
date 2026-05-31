@@ -6,7 +6,7 @@ A Temporal Graph Network (TGN) for detecting financial fraud rings on the Ellipt
 
 ## The Core Idea
 
-![Fraud Ring Visualization](assets/fraud_ring.png)
+![Fraud Ring Visualization](assets/image.png)
 
 Standard fraud detection treats every transaction as an independent row in a CSV. Real financial crime doesn't work that way — money laundering is a *network problem*. Accounts form rings, burner wallets relay funds, and sleeper accounts sit dormant for months before activating.
 

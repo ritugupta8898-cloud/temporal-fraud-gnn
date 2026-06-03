@@ -56,6 +56,8 @@ Total: 130-dim → linear layer → 64-dim message
 
 **GraphSAGE (3 layers)** — operates on node features concatenated with updated memory (166 + 64 = 230 input dimensions). Each layer aggregates from 1-hop, 2-hop, and 3-hop neighborhoods respectively.
 
+**GAT (3 layers)** — operates on node features concatenated with updated memory (166 + 64 = 230 input dimensions). Each layer aggregates from 1-hop, 2-hop, and 3-hop neighborhoods respectively.
+
 ---
 
 ## Fraud Patterns Targeted
@@ -88,7 +90,7 @@ Class imbalance ratio: ~9:1 (legitimate:fraud). Handled via weighted CrossEntrop
 
 ## Temporal Evaluation
 
-A critical design decision: the dataset is split by **time**, not randomly.
+I decided to split  the dataset by **time**, not randomly.
 
 | Split | Timesteps | Nodes |
 |---|---|---|
@@ -128,7 +130,8 @@ The loss during training for the TGN model was significantly higher than the bas
 The significant performance jump over the temporal baseline demonstrates the critical value of the persistent memory bank. While the baseline makes each prediction in isolation with no historical context, the TGN successfully carries behavioral sequences forward. This gives the model the temporal depth required to flag sophisticated laundering patterns, such as sleeper accounts that suddenly trigger massive transfers after long periods of dormancy.
 
 ---
-## Ablation Study: Subgraph Sampling Hops (without warm-up)
+## Ablation Study:
+### 1. Subgraph Sampling Hops (without warm-up)
 
 To enable memory-efficient training, full-graph training was replaced with temporal subgraph sampling. The number of hops controls how large each subgraph is — more hops = more context but higher memory and compute cost.
 
@@ -144,9 +147,27 @@ To enable memory-efficient training, full-graph training was replaced with tempo
 
 4-hop sampling achieves the best balance — enough neighborhood context to capture fraud ring structure without introducing noise from distant irrelevant nodes. Beyond 4 hops performance degrades, suggesting that fraud patterns in the Elliptic dataset are localized within 4 transaction hops.
 
+### 3. Architectural Backbones & Message Aggregation Strategies
+
+To determine the optimal configuration for temporal fraud detection on the Elliptic dataset, i conducted an ablation study for  distinct Graph Neural Network (GNN) backbones (GAT and GraphSAGE) combined with two memory message aggregation strategies within the Temporal Graph Network (TGN) framework. 
+
+Every configuration was evaluated using a  **Zero-Grad Memory Warmup** protocol from timesteps 1 to 41 before executing inference on the test set (timesteps 42 to 49).
+
+| Architecture Backbone | Message Aggregation Strategy | Test F1 Score |
+| :--- | :--- | :--- |
+| **GAT** | Mean Aggregation | **0.7131** |
+| **GraphSAGE** | Mean Aggregation | 0.7050 |
+| **GAT** | Symmetric Log-Sum Summation | 0.6966 |
+| **GraphSAGE** | Symmetric Log-Sum Summation | 0.6784 |
+
+#### Key Empirical Insights
+
+1. **Aggregation Strategy Impact (Mean > Log-Sum):** while training a single node or a account can have multiple transactions and the  in such cases we generate messages for all three transactions  and take their aggregate via 2 methods mean and log-sum the log-sum was choose to bring the volume of transaction into action which brings a good contrast between a account doing 5000 transactions vs 10 transactions in a span of 2 weeks 
+2. **Usage of GAT vs GraphSAGE (Anisotropic > Isotropic):** The attention-based mechanism of the GAT layers systematically outpaced the uniform aggregation of GraphSAGE across all tests (+0.0081 F1 under Mean, +0.0182 F1 under Log-Sum). Learning variable attention coefficients allows the downstream layers to isolate specific pathways of illicit token flow more effectively than treating neighbor attributes uniformly.
+
 ## Key Engineering Decisions
 
-**Why GraphSAGE over GCN** — GraphSAGE uses sampling-based aggregation and generalizes to unseen nodes. GCN requires the full graph during training, which doesn't scale to dynamic graphs where new nodes appear each timestep.
+**Why GraphSAGE  or  GAT over GCN** — GraphSAGE uses sampling-based aggregation and generalizes to unseen nodes. GCN requires the full graph during training, which doesn't scale to dynamic graphs where new nodes appear each timestep.
 
 **Why detach memory** — backpropagating through the full transaction history of a node with hundreds of past interactions would require unrolling hundreds of gradient steps, causing vanishing gradients and extreme memory usage. Detaching memory after each update treats stored memory as fixed context — the GRU weights still learn how to compress history, but gradients don't flow through the history itself.
 

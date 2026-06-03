@@ -7,7 +7,7 @@ from tgn import tgn
 
 data = torch.load('elliptic_graph.pt', weights_only=False)
 
-device = torch.device('cpu')
+device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 model = tgn(
     num_nodes=203769,
     node_feature_dim=166,

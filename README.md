@@ -128,6 +128,7 @@ To enable memory-efficient training, full-graph training was replaced with tempo
 | TGN | Temporal | Subgraph | 3 | 0.6975 |
 | TGN | Temporal | Subgraph | 4 | **0.7289** |
 | TGN | Temporal | Subgraph | 5 | 0.7196 |
+| TGN + GAT | Temporal | Subgraph | 4 | 0.7039 |
 
 4-hop sampling achieves the best balance — enough neighborhood context to capture fraud ring structure without introducing noise from distant irrelevant nodes. Beyond 4 hops performance degrades, suggesting that fraud patterns in the Elliptic dataset are localized within 4 transaction hops.
 

@@ -132,7 +132,7 @@ To enable memory-efficient training, full-graph training was replaced with tempo
 
 4-hop sampling achieves the best balance — enough neighborhood context to capture fraud ring structure without introducing noise from distant irrelevant nodes. Beyond 4 hops performance degrades, suggesting that fraud patterns in the Elliptic dataset are localized within 4 transaction hops.
 
-## Key Engineering Decisionsgit add README.md
+## Key Engineering Decisions
 
 **Why GraphSAGE over GCN** — GraphSAGE uses sampling-based aggregation and generalizes to unseen nodes. GCN requires the full graph during training, which doesn't scale to dynamic graphs where new nodes appear each timestep.
 
@@ -156,10 +156,10 @@ memory_module.py      # TGNMemory, MessageFunction, MemoryUpdater
 tgn.py                # full TGN model connecting all components
 train.py              # temporal training loop, timestep-by-timestep
 visualize.py          # fraud ring neighborhood visualization
----
+
 
 \```
-
+---
 ## Setup
 
 ```bash

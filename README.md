@@ -116,8 +116,22 @@ the loss while training the tgn model was significantly higher than the previous
 the f1 jump from 0.6349 to 0.7350 showed the memory was actually helping. the baseline had no memory of previous timesteps so every prediction was made in isolation. the tgn carries behavioral history forward which gives it the context to catch things like sleeper accounts that suddenly activate after being dormant.
 
 ---
+## Ablation Study: Subgraph Sampling Hops
 
-## Key Engineering Decisions
+To enable memory-efficient training, full-graph training was replaced with temporal subgraph sampling. The number of hops controls how large each subgraph is — more hops = more context but higher memory and compute cost.
+
+| Model | Split | Sampling | Hops | Test F1 |
+|---|---|---|---|---|
+| GraphSAGE | Random | Full graph | — | 0.9275 |
+| GraphSAGE | Temporal | Full graph | — | 0.6349 |
+| TGN | Temporal | Full graph | — | 0.7350 |
+| TGN | Temporal | Subgraph | 3 | 0.6975 |
+| TGN | Temporal | Subgraph | 4 | **0.7289** |
+| TGN | Temporal | Subgraph | 5 | 0.7196 |
+
+4-hop sampling achieves the best balance — enough neighborhood context to capture fraud ring structure without introducing noise from distant irrelevant nodes. Beyond 4 hops performance degrades, suggesting that fraud patterns in the Elliptic dataset are localized within 4 transaction hops.
+
+## Key Engineering Decisionsgit add README.md
 
 **Why GraphSAGE over GCN** — GraphSAGE uses sampling-based aggregation and generalizes to unseen nodes. GCN requires the full graph during training, which doesn't scale to dynamic graphs where new nodes appear each timestep.
 

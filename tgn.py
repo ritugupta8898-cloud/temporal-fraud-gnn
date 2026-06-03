@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 import  torch.nn.functional  as F
 from torch_geometric.nn import SAGEConv
 from memory_module import TGNMemory,MessageFunction,MemoryUpdater
@@ -24,18 +25,21 @@ class tgn(nn.Module):
         src = edge_index[0]
         dst = edge_index[1]
         if n_ids is not None:
-           src_memory = self.memory.get_memory(n_ids[src])
-           dst_memory = self.memory.get_memory(n_ids[dst])
+           src = n_ids[src]
+           dst = n_ids[dst]
 
-           time_delta_src = timestamps-self.memory.last_update[n_ids[src]]
-           time_delta_dst = timestamps-self.memory.last_update[n_ids[dst]]
-        else:   
+        all_nodes = torch.cat([src,dst])
 
-            src_memory = self.memory.get_memory(src)
-            dst_memory = self.memory.get_memory(dst)
 
-            time_delta_src = timestamps-self.memory.last_update[src]
-            time_delta_dst = timestamps-self.memory.last_update[dst]
+       
+           
+       
+
+        src_memory = self.memory.get_memory(src)
+        dst_memory = self.memory.get_memory(dst)
+
+        time_delta_src = timestamps-self.memory.last_update[src]
+        time_delta_dst = timestamps-self.memory.last_update[dst]
 
         
          
@@ -43,21 +47,59 @@ class tgn(nn.Module):
         src_message = self.message_function(src_memory, dst_memory, time_delta_src, timestamps)
         dst_message = self.message_function(dst_memory, src_memory, time_delta_dst, timestamps)
 
+        all_messages = torch.cat([src_message,dst_message],dim=0)
+        aggregated_messages = torch.zeros(
+             self.memory.num_nodes,
+             all_messages.size(1),
+             device=all_messages.device
+            )
+
+        aggregated_messages.index_add_(
+             0,
+             all_nodes,
+             all_messages
+            )
+
+        counts = torch.zeros(
+             self.memory.num_nodes,
+             device=all_messages.device
+        )
+
+        counts.index_add_(
+             0,
+             all_nodes,
+             torch.ones(
+             all_nodes.size(0),
+             device=all_nodes.device
+    )
+)
+
+        aggregated_messages = (
+             aggregated_messages
+             / counts.clamp(min=1).unsqueeze(1)
+        )
+
+
+        
+       
+        src_message = aggregated_messages[src]
+        dst_message = aggregated_messages[dst]
+
+
+
         new_src_memory = self.memory_updater(src_message, src_memory)
         new_dst_memory = self.memory_updater(dst_message, dst_memory)
 
-        if n_ids is not None:
-            self.memory.update_memory(n_ids[src], new_src_memory.detach(), timestamps)
-            self.memory.update_memory(n_ids[dst], new_dst_memory.detach(), timestamps)
-        else:
-          self.memory.update_memory(src, new_src_memory.detach(), timestamps)
-          self.memory.update_memory(dst, new_dst_memory.detach(), timestamps)
+        
+        self.memory.update_memory(src, new_src_memory.detach(), timestamps)
+        self.memory.update_memory(dst, new_dst_memory.detach(), timestamps)
 
 
+       
         if n_ids is not None:
-             all_memory = self.memory.get_memory(n_ids[:x.size(0)])
+            all_memory = self.memory.get_memory(n_ids[:x.size(0)])
         else:
-             all_memory = self.memory.get_memory(torch.arange(x.size(0)))
+            all_memory = self.memory.get_memory(torch.arange(x.size(0)))
 
         x = torch.cat([x, all_memory], dim=1)
 

@@ -2,7 +2,7 @@
 
 A Temporal Graph Network (TGN) for detecting financial fraud rings on the Elliptic Bitcoin transaction dataset. Built from scratch using PyTorch and PyTorch Geometric — no TGN library used.
 
----
+--- 
 
 ## The Core Idea
 
@@ -104,6 +104,19 @@ When I first got 0.9275 I thought the model was incredible. Then I realized the 
 
 ## Results
 
+### 1.  After Zero-Grad Memory Warmup
+In a real-world deployment, a bank does not retrain model weights weekly, but the transaction stream never stops. To simulate this, the TGN implements a **Zero-Grad Memory Warmup**:
+1. **Train** weights from t=1 to 34.
+2. **Freeze** weights.
+3. **Fast-forward** the transaction stream from t=35 to 41 purely to update the TGN Memory Bank.
+4. **Evaluate** on strictly unseen future data from t=42 to 49.
+
+| Model | Inference Strategy | Sampling | Test F1 |
+|---|---|---|---|
+| TGN | Zero-Grad Memory Warmup | 4-hop Subgraph | **0.7173** |
+
+Achieving an F1 score of **0.7173** on strictly unseen future data—using neural network weights up to 15 timesteps out of date—proves the TGN learns fundamental rules of money laundering. The dynamic memory module successfully carries the real-time situational context forward.
+### 2. Directly  tested without Warmup  
 | Model | Split Strategy | Test F1 |
 |---|---|---|
 | GraphSAGE (baseline) | Random | 0.9275 |
@@ -116,7 +129,7 @@ the loss while training the tgn model was significantly higher than the previous
 the f1 jump from 0.6349 to 0.7350 showed the memory was actually helping. the baseline had no memory of previous timesteps so every prediction was made in isolation. the tgn carries behavioral history forward which gives it the context to catch things like sleeper accounts that suddenly activate after being dormant.
 
 ---
-## Ablation Study: Subgraph Sampling Hops
+## Ablation Study: Subgraph Sampling Hops (without warm-up)
 
 To enable memory-efficient training, full-graph training was replaced with temporal subgraph sampling. The number of hops controls how large each subgraph is — more hops = more context but higher memory and compute cost.
 

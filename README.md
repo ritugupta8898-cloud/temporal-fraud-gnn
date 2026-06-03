@@ -117,7 +117,7 @@ In a real-world deployment, a bank does not retrain model weights weekly, but th
 |---|---|---|---|
 | TGN | Zero-Grad Memory Warmup | 4-hop Subgraph | **0.7173** |
 
-Achieving an F1 score of **0.7173** on strictly unseen future data—using neural network weights up to 15 timesteps out of date—proves the TGN learns fundamental rules of money laundering. The dynamic memory module successfully carries the real-time situational context forward.
+Achieving an F1 score of 0.7173 on strictly unseen future data suggests that the TGN captures temporal behavioral patterns that remain useful even when model weights are frozen.
 ### 2. Directly  tested without Warmup  
 | Model | Split Strategy | Test F1 |
 |---|---|---|
@@ -145,7 +145,7 @@ To enable memory-efficient training, full-graph training was replaced with tempo
 | TGN | Temporal | Subgraph | 5 | 0.7196 |
 | TGN + GAT | Temporal | Subgraph | 4 | 0.7039 |
 
-4-hop sampling achieves the best balance — enough neighborhood context to capture fraud ring structure without introducing noise from distant irrelevant nodes. Beyond 4 hops performance degrades, suggesting that fraud patterns in the Elliptic dataset are localized within 4 transaction hops.
+4-hop sampling achieves the best balance — enough neighborhood context to capture fraud ring structure without introducing noise from distant irrelevant nodes. Beyond 4 hops performance degrades, suggesting that additional distant neighborhood information may introduce more noise than useful signal on this dataset.
 
 ### 3. Architectural Backbones & Message Aggregation Strategies
 
@@ -163,7 +163,7 @@ Every configuration was evaluated using a  **Zero-Grad Memory Warmup** protocol 
 #### Key Empirical Insights
 
 1. **Aggregation Strategy Impact (Mean > Log-Sum):** while training a single node or a account can have multiple transactions and the  in such cases we generate messages for all three transactions  and take their aggregate via 2 methods mean and log-sum the log-sum was choose to bring the volume of transaction into action which brings a good contrast between a account doing 5000 transactions vs 10 transactions in a span of 2 weeks 
-2. **Usage of GAT vs GraphSAGE (Anisotropic > Isotropic):** The attention-based mechanism of the GAT layers systematically outpaced the uniform aggregation of GraphSAGE across all tests (+0.0081 F1 under Mean, +0.0182 F1 under Log-Sum). Learning variable attention coefficients allows the downstream layers to isolate specific pathways of illicit token flow more effectively than treating neighbor attributes uniformly.
+2. **Usage of GAT vs GraphSAGE (Anisotropic > Isotropic):** The attention-based mechanism of the GAT layers achieved the highest observed F1 scores  all tests (+0.0081 F1 under Mean, +0.0182 F1 under Log-Sum). Learning variable attention coefficients allows the downstream layers to isolate specific pathways of illicit token flow more effectively than treating neighbor attributes uniformly.
 
 ## Key Engineering Decisions
 

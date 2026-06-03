@@ -1,3 +1,8 @@
+"""
+Temporal Fraud GNN
+Author: Pratyush Gupta
+Copyright (c) 2026 Pratyush Gupta. All Rights Reserved.
+"""
 import torch
 from sklearn.metrics import f1_score
 from torch_geometric.utils import subgraph

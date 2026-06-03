@@ -1,3 +1,8 @@
+"""
+Temporal Fraud GNN
+Author: Pratyush Gupta
+Copyright (c) 2026 Pratyush Gupta. All Rights Reserved.
+"""
 from torch_geometric.nn import GATConv
 import torch.nn.functional as F
 import torch

@@ -1,3 +1,8 @@
+"""
+Temporal Fraud GNN
+Author: Pratyush Gupta
+Copyright (c) 2026 Pratyush Gupta. All Rights Reserved.
+"""
 import torch
 import torch.nn as nn
 import torch.optim as optim

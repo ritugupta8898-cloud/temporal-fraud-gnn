@@ -3,21 +3,20 @@
 A Temporal Graph Network (TGN) for detecting financial fraud rings on the Elliptic Bitcoin transaction dataset. Built from scratch using PyTorch and PyTorch Geometric — no TGN library used.
 
 --- 
+## How the Pipeline Works
 
-## The Core Idea
+The data flows through a custom pipeline every time a transaction occurs at a timestep $t$:
+1 Memory Lookup: Grab the current state vectors for the source and destination nodes from a persistent memory bank.
 
-![Fraud Ring Visualization](assets/fraud_ring.png)
+2 Message Generation: A custom layer concatenates the source memory, destination memory, time elapsed since the source's last transaction, and raw edge features. This 130-dimensional vector is pushed through a linear layer down to 64 dimensions.
 
-Standard fraud detection treats every transaction as an independent row in a CSV. Real financial crime doesn't work that way — money laundering is a *network problem*. Accounts form rings, burner wallets relay funds, and sleeper accounts sit dormant for months before activating.
+3 Memory Update: A GRUCell takes this message and updates the node's memory. Crucial detail: I explicitly detach the memory tensor here so PyTorch doesn't try to backpropagate gradients back through the entire transaction history, which would absolutely obliterate GPU VRAM.
 
-This project models the Bitcoin transaction network as a dynamic graph where:
-- Every **node** is a Bitcoin transaction
-- Every **edge** is a flow of funds between transactions
-- Every node has a **memory vector** that accumulates its behavioral history over time
+4 Spatial Aggregation: The updated memory is tacked onto the node's raw features (yielding a 230-dimensional vector) and fed into a 4-hop GraphSAGE backbone to pull in structural context from surrounding nodes.
 
-The model learns to detect fraud not from individual transactions, but from how suspicious subgraphs evolve over time.
+ 
 
----
+
 
 ## Architecture
 \```
@@ -60,16 +59,6 @@ Total: 130-dim → linear layer → 64-dim message
 
 ---
 
-## Fraud Patterns Targeted
-
-**Burst Attack (Smurfing)** — a central node receiving massive transaction volume within a single timestep, designed to stay below reporting thresholds.
-
-**Sleeper Cell** — a node with zero activity for many timesteps suddenly executing large transfers. Detectable via the time delta signal in the memory update.
-
-**Chronological Layering** — A→B before B→C forms a directed cycle. A static graph sees a triangle. The temporal model sees a sequence — money laundering in motion.
-
----
-
 ## Dataset
 
 **Elliptic Bitcoin Transaction Dataset** — used in published GNN fraud detection research.
@@ -86,6 +75,17 @@ Total: 130-dim → linear layer → 64-dim message
 
 Class imbalance ratio: ~9:1 (legitimate:fraud). Handled via weighted CrossEntropyLoss with fraud weight 9.25.
 
+![Fraud Ring Visualization](assets/fraud_ring.png)
+
+
+This project models the Bitcoin transaction network as a dynamic graph where:
+- Every **node** is a Bitcoin transaction
+- Every **edge** is a flow of funds between transactions
+- Every node has a **memory vector** that accumulates its behavioral history over time
+
+The model learns to detect fraud not from individual transactions, but from how suspicious subgraphs evolve over time.
+
+
 ---
 
 ## Temporal Evaluation
@@ -98,7 +98,7 @@ I decided to split  the dataset by **time**, not randomly.
 | Validation | 35 — 41 | 7,829 |
 | Test | 42 — 49 | 8,841 |
 
-Random splitting would allow the model to train on timestep 40 data and test on timestep 5 — leaking future information into training. Temporal splitting enforces the constraint that the model can only predict the future, never the past.
+Random splitting would allowed the model to train on timestep 40 data and test on timestep 5 — leaking future information into training. Temporal splitting enforces the constraint that the model can only predict the future, never the past.
 
 When I first got 0.9275 I thought the model was incredible. Then I realized the random split was letting the model train on future data — it was basically cheating. The real number after fixing the split was 0.6349. Most fraud detection projects on Kaggle never catch this
 
@@ -160,20 +160,20 @@ Every configuration was evaluated using a  **Zero-Grad Memory Warmup** protocol 
 | **GAT** | Symmetric Log-Sum Summation | 0.6966 |
 | **GraphSAGE** | Symmetric Log-Sum Summation | 0.6784 |
 
-#### Key Empirical Insights
+#### Implementation Reasoning
 
 1. **Aggregation Strategy Impact (Mean > Log-Sum):** while training a single node or a account can have multiple transactions and the  in such cases we generate messages for all three transactions  and take their aggregate via 2 methods mean and log-sum the log-sum was choose to bring the volume of transaction into action which brings a good contrast between a account doing 5000 transactions vs 10 transactions in a span of 2 weeks 
 2. **Usage of GAT vs GraphSAGE (Anisotropic > Isotropic):** The attention-based mechanism of the GAT layers achieved the highest observed F1 scores  all tests (+0.0081 F1 under Mean, +0.0182 F1 under Log-Sum). Learning variable attention coefficients allows the downstream layers to isolate specific pathways of illicit token flow more effectively than treating neighbor attributes uniformly.
 
-## Key Engineering Decisions
+##  Some of the Decisions I made 
 
-**Why GraphSAGE  or  GAT over GCN** — GraphSAGE uses sampling-based aggregation and generalizes to unseen nodes. GCN requires the full graph during training, which doesn't scale to dynamic graphs where new nodes appear each timestep.
+**1  GraphSAGE  or  GAT over GCN** — GraphSAGE uses sampling-based aggregation and generalizes to unseen nodes. GCN requires the full graph during training, which doesn't scale to dynamic graphs where new nodes appear each timestep.
 
-**Why detach memory** — backpropagating through the full transaction history of a node with hundreds of past interactions would require unrolling hundreds of gradient steps, causing vanishing gradients and extreme memory usage. Detaching memory after each update treats stored memory as fixed context — the GRU weights still learn how to compress history, but gradients don't flow through the history itself.
+**why did i detach memory** — backpropagating through the full transaction history of a node with hundreds of past interactions would require unrolling hundreds of gradient steps, causing vanishing gradients and extreme memory usage. Detaching memory after each update treats stored memory as fixed context — the GRU weights still learn how to compress history, but gradients don't flow through the history itself.
 
-**Why weighted loss** — with 9:1 class imbalance, a model predicting "legitimate" for everything achieves 90% accuracy. Weighted CrossEntropyLoss penalizes fraud misclassification 9.25x more than legitimate misclassification, forcing the model to learn the minority class.
+**Why weighted loss was used** — with 9:1 class imbalance, a model predicting "legitimate" for everything achieves 90% accuracy. Weighted CrossEntropyLoss penalizes fraud misclassification 9.25x more than legitimate misclassification, forcing the model to learn the minority class.
 
-**Why temporal splits** — random splits inflate performance by testing on transactions from the same time periods as training. Real fraud detection systems only ever predict future transactions. Temporal splits enforce this constraint and give an honest performance estimate.
+**Why temporal splits over randomsplit** — random splits inflate performance by testing on transactions from the same time periods as training. Real fraud detection systems only ever predict future transactions. Temporal splits enforce this constraint and give an honest performance estimate.
 
 **The problems i faced** - the hardest part was getting the temporal masking right — creating separate node masks and edge masks for each time split while making sure no future data leaked into training. the syntax was unintuitive and took a while to get right.
 had to read the original TGN paper (Rossi et al. 2020) to understand the memory update order — specifically whether to update memory before or after the GraphSAGE forward pass. ended up going with update-first then classify, but update-after-classify is a valid alternative and something i want to experiment with next.

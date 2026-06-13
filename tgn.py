@@ -53,42 +53,34 @@ class tgn(nn.Module):
         dst_message = self.message_function(dst_memory, src_memory, time_delta_dst, timestamps)
 
         all_messages = torch.cat([src_message,dst_message],dim=0)
-        aggregated_messages = torch.zeros(
-             self.memory.num_nodes,
+
+        unique_nodes, inverse_indices = torch.unique(all_nodes, return_inverse=True)
+        
+        batch_aggregated = torch.zeros(
+             unique_nodes.size(0),
              all_messages.size(1),
              device=all_messages.device
-            )
-
-        aggregated_messages.index_add_(
-             0,
-             all_nodes,
-             all_messages
-            )
-
+        )
+        
         counts = torch.zeros(
-             self.memory.num_nodes,
+             unique_nodes.size(0),
              device=all_messages.device
         )
 
-        counts.index_add_(
-             0,
-             all_nodes,
-             torch.ones(
-             all_nodes.size(0),
-             device=all_nodes.device
-    )
-)
+        batch_aggregated.index_add_(0, inverse_indices, all_messages)
+        counts.index_add_(0, inverse_indices, torch.ones(all_nodes.size(0), device=all_nodes.device))
 
-        aggregated_messages = (
-             aggregated_messages
-             / counts.clamp(min=1).unsqueeze(1)
-        )
-
-
+        batch_aggregated = batch_aggregated / counts.clamp(min=1).unsqueeze(1)
         
-       
-        src_message = aggregated_messages[src]
-        dst_message = aggregated_messages[dst]
+        msg_lookup = torch.zeros(
+            self.memory.num_nodes, 
+            all_messages.size(1), 
+            device=all_messages.device
+        )
+        msg_lookup[unique_nodes] = batch_aggregated
+        
+        src_message = msg_lookup[src]
+        dst_message = msg_lookup[dst]
 
 
 
